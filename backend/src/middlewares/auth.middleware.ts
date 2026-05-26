@@ -39,9 +39,6 @@ export const protectRoute = async(req: Request, res: Response, next: NextFunctio
                 role: user.role as 'professional' | 'admin' | 'superAdmin'
             };
 
-            console.log(accessToken);
-
-
             next();
         } catch (error: any) {
             if (error.name === "TokenExpiredError") {
@@ -58,7 +55,7 @@ export const protectRoute = async(req: Request, res: Response, next: NextFunctio
 }
 
 export const adminRoute = async(req: Request, res: Response, next: NextFunction) => {
-    if (req.user && req.user.role === "admin") {
+    if (req.user &&  ["admin", "superAdmin"].includes(req.user.role)) {
         next();
     }else{
         return res.status(403).json({message: "Access denied - Admin only"})
