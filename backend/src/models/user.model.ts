@@ -17,7 +17,7 @@ type AccountStatus = (typeof accountStatuses)[number];
 interface AccountSchemaType {
   email: string;
   passwordHash: string;
-  resetPasswordToken?: string | null;
+  resetPasswordTokenHash?: string | null;
   resetPasswordExpiresAt?: Date | null;
   passwordChangedAt?: Date | null;
   name: string;
@@ -59,7 +59,7 @@ const accountSchema = new Schema<
       select: false,
     },
 
-    resetPasswordToken: {
+    resetPasswordTokenHash: {
       type: String,
       default: null,
       select: false,
@@ -196,9 +196,68 @@ const professionalProfileSchema = new Schema(
       index: true,
     },
 
+    services: {
+      type:[
+        {
+          name: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          description: {
+            type: String,
+            trim: true, 
+          },
+          price: {
+            type: Number,
+            min: 0,
+          }
+        }
+      ]
+    },
+
+    reviews: {
+      type: [
+        {
+          user: {
+            type: String,
+          },
+          rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+          },
+          comment: {
+            type: String,
+            trim: true,
+          },
+        },
+      ],
+      default: [],
+    },
+
     experienceYears: {
       type: Number,
       default: 0,
+      min: 0,
+    },
+
+    projectsCompleted: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    clientRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+
+    responseTimeHours: {
+      type: Number,
+      default: 24,
       min: 0,
     },
 
