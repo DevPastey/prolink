@@ -1,7 +1,16 @@
-import jwt from "jsonwebtoken";
-import User from "../models/user.model.js";
+import jwt, { type JwtPayload} from "jsonwebtoken";
+import { Account } from "../models/user.model.js";
+import { type Request, type Response, type NextFunction } from "express";
+import dotenv from "dotenv";
+dotenv.config();
 
-export const protectRoute = async(req, res, next) => {
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+
+interface AccessTokenPayload extends JwtPayload {
+  email: string;
+};
+
+export const protectRoute = async(req: Request, res: Response, next: NextFunction) => {
     try {
         const accessToken = req.cookies.accessToken;
 
@@ -10,8 +19,15 @@ export const protectRoute = async(req, res, next) => {
         }
 
         try {
-            const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-            const user = await User.findById(decoded.userId).select("-password");
+           const decoded = jwt.verify(
+                accessToken,
+                ACCESS_TOKEN_SECRET as string
+            ) as AccessTokenPayload;
+
+
+            const user = await Account.findOne({ 
+                email: decoded.email
+            }).select("+passwordHash");
             
             if (!user) {
                 return res.status(401).json({message: "User not found"});
@@ -20,7 +36,7 @@ export const protectRoute = async(req, res, next) => {
             req.user = user;
 
             next();
-        } catch (error) {
+        } catch (error: any) {
             if (error.name === "TokenExpiredError") {
 				return res.status(401).json({ message: "Unauthorized - Access token expired" });
 			}
@@ -34,10 +50,18 @@ export const protectRoute = async(req, res, next) => {
     }
 }
 
-export const adminRoute = async(req, res, next) => {
+export const adminRoute = async(req: Request, res: Response, next: NextFunction) => {
     if (req.user && req.user.role === "admin") {
         next();
     }else{
         return res.status(403).json({message: "Access denied - Admin only"})
     }
 }
+
+export const superAdminRoute = async(req: Request, res: Response, next: NextFunction) => {
+    if (req.user && req.user.role === "superAdmin") {
+        next(); 
+    }else{
+        return res.status(403).json({message: "Access denied - Super Admin only"})
+    }
+};
