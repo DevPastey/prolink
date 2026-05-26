@@ -1,13 +1,14 @@
 import jwt, { type JwtPayload} from "jsonwebtoken";
 import { Account } from "../models/user.model.js";
 import { type Request, type Response, type NextFunction } from "express";
-import dotenv from "dotenv";
-dotenv.config();
+import {config} from "dotenv";
+
+config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 interface AccessTokenPayload extends JwtPayload {
-  email: string;
+  userId: string;
 };
 
 export const protectRoute = async(req: Request, res: Response, next: NextFunction) => {
@@ -25,15 +26,21 @@ export const protectRoute = async(req: Request, res: Response, next: NextFunctio
             ) as AccessTokenPayload;
 
 
-            const user = await Account.findOne({ 
-                email: decoded.email
-            }).select("+passwordHash");
+            const user = await Account.findById(
+                decoded.userId
+            ).select("+passwordHash");
             
             if (!user) {
                 return res.status(401).json({message: "User not found"});
             }
 
-            req.user = user;
+            req.user = {
+                id: user._id.toString(),
+                role: user.role as 'professional' | 'admin' | 'superAdmin'
+            };
+
+            console.log(accessToken);
+
 
             next();
         } catch (error: any) {

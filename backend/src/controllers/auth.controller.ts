@@ -2,6 +2,13 @@ import { type Request, type Response } from 'express';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { Account } from '../models/user.model.js';
 import { redis } from '../lib/redis.js';
+import crypto from 'crypto';
+import dotenv from 'dotenv';
+import { sendPasswordResetEmail } from '../lib/email.js';
+dotenv.config();
+
+const CLIENT_URL = process.env.CLIENT_URL;
+
 
 const generateTokens = (userId: string) => {
     const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "30m" });
@@ -14,18 +21,19 @@ const storeRefreshTokens = async(userId: string, refreshToken: string) => {
 };
 
 const setCookies = (res: Response, accessToken: string, refreshToken: string) => {
-    res.cookie("access_token", accessToken, { 
-        httpOnly: true, 
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 30 * 60 * 1000, // 30 minutes
-    });
+
+    const cookieOptions = {
+        httpOnly: true, // Prevents XSS attacks by blocking JavaScript access
+        secure: process.env.NODE_ENV === "production", // Only forces HTTPS in production
+        sameSite: "lax" as const, // Allows cross-origin requests between localhost ports
+        maxAge: 30 * 60 * 1000 // 30 minutes in milliseconds
+    };
+
+    res.cookie("accessToken", accessToken, cookieOptions);
 
 
-    res.cookie("refresh_token", refreshToken, { 
-        httpOnly: true, 
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+    res.cookie("refreshToken", refreshToken, { 
+        ...cookieOptions,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 };
@@ -40,7 +48,7 @@ export const signin = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        const { accessToken, refreshToken } = generateTokens(user.id.toString());
+        const { accessToken, refreshToken } = generateTokens(user._id.toString());
         await storeRefreshTokens(user._id.toString(), refreshToken);
         setCookies(res, accessToken, refreshToken);
         res.json({ message: "Signin successful" });
@@ -53,7 +61,7 @@ export const signin = async (req: Request, res: Response) => {
 
 
 export const signup = async (req: Request, res: Response) => {
-    const { email, name, password, confirmPassword, role } = req.body;
+    const { email, name, password, role } = req.body;
     const UserExist = await Account.findOne({email});
 
     try{
@@ -96,8 +104,8 @@ export const signout = async (req: Request, res: Response) => {
             await redis.del(`refresh_token:${decoded.userId}`);
         }
 
-        res.clearCookie("access_token");
-        res.clearCookie("refresh_token");
+        res.clearCookie("accessToken");
+        res.clearCookie("refreshToken");
         res.json({message: "Signout successful"});
 
     }catch(error: any){
@@ -122,7 +130,9 @@ export const refreshToken = async (req: Request, res: Response) => {
         }
 
         const accessToken = jwt.sign({ userId: decoded.userId }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "30m" });
+
         setCookies(res, accessToken, refreshToken);
+
         res.json({ message: "Token refreshed successfully" });
     }catch(error: any){
         if (error.name === "TokenExpiredError") {
@@ -146,17 +156,34 @@ export const getProfile = async (req: Request, res: Response) => {
 };
 
 
-export const forgotPassword = async (req: Request, res: Response) => {
-    const { email } = req.body;
-
+export const forgotPassword = async (req: Request, res: Response) => {    
     try{
+
+        const { email } = req.body;
+        const safeResponse = { message: "If an account with that email exists, a password reset link has been sent." };
+
         const user = await Account.findOne({ email });
 
         if (!user) {
-            return res.status(404).json({message: "User not found"});
+            return res.status(200).json(safeResponse);
         }
 
-        
+
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+        user.resetPasswordTokenHash = resetTokenHash;
+        user.resetPasswordExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        await user.save();
+
+        const resetUrl =
+        `${CLIENT_URL}/reset-password?token=${resetToken}`;
+
+        await sendPasswordResetEmail(user.email, resetUrl);
+
+        console.log(`Password reset link for ${email}: ${resetUrl}`);
+
+        return res.status(200).json(safeResponse);
 
 
     }catch(error: any){
@@ -165,6 +192,45 @@ export const forgotPassword = async (req: Request, res: Response) => {
 };
 
 export const resetPassword = async (req: Request, res: Response) => {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!token || typeof token !== "string") {
+        return res.status(400).json({
+            message: "Invalid token",
+        });
+    }
+
+    const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+    const user = await Account.findOne({
+        resetPasswordTokenHash: resetTokenHash,
+        resetPasswordExpiresAt: {
+        $gt: new Date(),
+        },
+    }).select("+resetPasswordTokenHash +resetPasswordExpiresAt +passwordHash");
+
+    if (!user) {
+        return res.status(400).json({
+        message: "Invalid or expired password reset token",
+        });
+    }
+
+    user.passwordHash = password;
+    user.resetPasswordTokenHash = null;
+    user.resetPasswordExpiresAt = null;
+    user.passwordChangedAt = new Date();
+
+    await user.save();
+
+    await redis.del(`refresh_token:${user._id.toString()}`);
+
+    return res.status(200).json({
+        message: "Password reset successful",
+    });
 
 };
 
