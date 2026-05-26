@@ -6,7 +6,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-
+import professionalRoutes from './routes/professional.route.js';
 dotenv.config();
 
 
@@ -22,6 +22,7 @@ app.use(cors({
 }));
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/professionals', professionalRoutes);
 
 const swaggerOptions = {
   definition: {

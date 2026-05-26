@@ -1,6 +1,6 @@
 import { type Request, type Response } from 'express';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
-import { Account } from '../models/user.model.js';
+import { Account, Professional } from '../models/user.model.js';
 import { redis } from '../lib/redis.js';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -149,7 +149,24 @@ export const getProfile = async (req: Request, res: Response) => {
         if (!user) {
             return res.status(404).json({message: "User not found"});
         }
-        res.json({ user });
+
+        const professionalDetails = await Professional.findOne({ accountId: user.id });
+
+        if (!professionalDetails) {
+            return res.status(404).json({message: "Professional User data not found"});
+        }
+
+    
+        if (professionalDetails.accountId.toString() !== user.id) {
+            return res.status(403).json({message: "Forbidden - Access to this profile is denied"});
+        }
+
+        
+        res.json({
+            user, 
+            professionalDetails: professionalDetails 
+        });
+
     }catch(error: any){
         res.status(500).json({message: "Server Error", error: error.message});
     }
