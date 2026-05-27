@@ -5,6 +5,8 @@ import { ExplorePage } from './pages/ExplorePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { NotFound } from './pages/NotFound';
+import SignupPage from './pages/SignupPage';
+import LoginPage from './pages/LoginPage';
 
 export default function App() {
   return (
@@ -15,8 +17,11 @@ export default function App() {
           <Route path="explore" element={<ExplorePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="signup" element={<SignupPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
+
       </Routes>
     </BrowserRouter>
   );

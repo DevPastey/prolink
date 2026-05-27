@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Search } from "lucide-react";
+import { ThemeToggle } from "../components/Themetoggle";
 
 export function Navbar() {
   return (
@@ -23,12 +24,15 @@ export function Navbar() {
             <Link to="/dashboard" className="text-foreground/80 hover:text-foreground transition-colors">
               Dashboard
             </Link>
-            <button className="px-4 py-2 rounded-lg text-foreground/80 hover:text-foreground transition-colors">
+            <Link to="/login" className="px-4 py-2 rounded-lg text-foreground/80 hover:text-foreground transition-colors">
               Login
-            </button>
-            <button className="px-5 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/20">
+            </Link>
+            <Link to="/signup" className="px-5 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/20">
               Sign Up
-            </button>
+            </Link>
+            <div>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
